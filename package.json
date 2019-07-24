@@ -1,0 +1,31 @@
+{
+  "name": "vg-roller",
+  "version": "1.0.0",
+  "description": "A die roller for the Velvet Generation tabletop RPG",
+  "main": "index.js",
+  "dependencies": {
+    "discord.js": "^11.5.1",
+    "faker": "^4.1.0",
+    "lodash": "^4.17.11"
+  },
+  "devDependencies": {
+    "nodemon": "^1.19.1",
+    "chai": "^4.2.0",
+    "mocha": "^6.1.4"
+  },
+  "scripts": {
+    "test": "mocha test",
+    "dev": "nodemon index.js",
+    "dev-test": "nodemon node_modules/.bin/mocha test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/richranallo/vg-roller.git"
+  },
+  "author": "Rich Ranallo",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/richranallo/vg-roller/issues"
+  },
+  "homepage": "https://github.com/richranallo/vg-roller#readme"
+}
