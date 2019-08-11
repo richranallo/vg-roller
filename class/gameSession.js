@@ -36,15 +36,18 @@ module.exports =  class GameSession {
       } else replyTo(`<@${player_id}>, you didn't roll any 1s.`)
     } else replyTo(`<@${player_id}>, you can only reroll 1s at the start of the round.`)
   }
-  /*commitRoll = ({player_id, for_group, replyTo} = options) => {
-    let rollingPlayer = _.find(this.players, {id: player_id})
-    if(for_group){
-      this.group_pool.set(rollingPlayer.roll)
-    } else {
-      rollingPlayer.pool.set(rollingPlayer.roll)
-    }
-    rollingPlayer.roll = []
-  }*/
+  wild = ({player_id, dice, replyTo} = options) => {
+      let rollingPlayer = _.find(this.players, {id: player_id})
+      let all1s = _.remove(rollingPlayer.pool.dice, r => r ===1)
+      /******/console.log('all1s', all1s)
+      /******/console.log('rollingPlayer.pool.dice', rollingPlayer.pool.dice)
+      if(!_.isEmpty(all1s)){
+        rollingPlayer.pool.dice.push(...dice)
+        replyTo(`<@${player_id}>, you now have ${formatPool(rollingPlayer.pool.dice)}.`)
+      } else {
+        replyTo(`<@${player_id}>, you don't have enough 1s for that.`)
+      }
+  }
   double = ({player_id, replyTo} = options) => {
      if(this.round.start_of_round){
       let rollingPlayer = _.find(this.players, {id: player_id})
@@ -66,14 +69,31 @@ module.exports =  class GameSession {
     receivingPlayer.pool.dice.push(...givingPool)
     replyTo(`<@${receiving_player_id}> now has ${formatPool(receivingPlayer.pool.dice)}`)
   }
-  spend = ({player_id, dice, replyTo}) => {
+  spend = ({player_id, dice, replyTo, leave, take}) => {
+    leave = (_.isUndefined(leave)) ? (_.isUndefined(take)) ? 1 : 0 : leave
     let spendingPlayer = _.find(this.players, {id: player_id})
     let spentSet = removeSubset(spendingPlayer.pool.dice, dice)
+    /*******/ console.log('take', take)
     if(_.isEmpty(spentSet)) {
       replyTo(`<@${player_id}>, you don't have that many dice to spend`)
       return false
     }
+    if(take > 0){
+      /********/  console.log('adding...', _.fill(new Array(take), spentSet[0]))
+      spentSet.push(...removeSubset(this.group_pool.dice, _.fill(new Array(take), spentSet[0])))
+    }
+    /********/  console.log('spentSet', spentSet)
     replyTo(`<@${player_id}> spent ${formatPool(spentSet)}`)
+    if(leave > 0){
+      let leavingSet = spentSet.splice(0, leave)
+      replyTo(`...and left ${formatPool(leavingSet)} in the group pool`)
+      this.group_pool.dice.push(...leavingSet)
+    }
+  }
+  grant = ({player_id, dice, replyTo}) => {
+    let receivingPlayer = _.find(this.players, {id: player_id})
+    receivingPlayer.pool.dice.push(...dice)
+    replyTo(`<@${receivingPlayer.id}> gained ${formatPool(dice)}`)
   }
   status = () => {
     return _.toPlainObject(this)

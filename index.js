@@ -4,6 +4,9 @@ const client = new Discord.Client()
 const _ = require('lodash')
 const {formatPool, pullDice} = require('./tools')
 const GameSession = require ('./class/gameSession')
+client.on('uncaughtException', (err) => {
+  console.log('err', err)
+})
 
 const {findChannelGame} = require('./game')
 let gameIndex
@@ -29,20 +32,20 @@ process.on('uncaughtException', err => {
 **********/
 
 client.on('ready', () => {
-
   gameIndex = []
-    console.log('Connected as ' + client.user.tag)
-    // List servers the bot is connected to
-    console.log('Servers:')
-    client.guilds.forEach((guild) => {
-        console.log(' - ' + guild.name)
-      // List all channels
-      guild.channels.forEach((channel) => {
-          console.log(` -- ${channel.name} (${channel.type}) - ${channel.id}`)
-      })
+  console.log('Connected as ' + client.user.tag)
+  // List servers the bot is connected to
+  console.log('Servers:')
+  client.guilds.forEach((guild) => {
+      console.log(' - ' + guild.name)
+    // List all channels
+    guild.channels.forEach((channel) => {
+        // console.log(` -- ${channel.name} (${channel.type}) - ${channel.id}`)
+        console.log('-- channel', channel.name, channel.permissionOverwrites)
     })
-    var generalChannel = client.channels.get('597162766914027525') // Replace with known channel ID
-    generalChannel.send(`\`THE_DIE_ROLLER\` has logged on`)
+  })
+  var generalChannel = client.channels.get('597162766914027525') // Replace with known channel ID
+  generalChannel.send(`\`THE_DIE_ROLLER\` has logged on`)
 })
 
 client.on('message', (receivedMessage) => {
@@ -52,34 +55,37 @@ client.on('message', (receivedMessage) => {
   function replyTo(msg){
     return channel.send(msg)
   }
-    
-  // Check if the bot's user was tagged in the message
-  let botNameMatch = new RegExp('^' + client.user.toString())
+  try{
+    // Check if the bot's user was tagged in the message
+    let botNameMatch = new RegExp('^' + client.user.toString())
     if (content.match(botNameMatch)) {
-      let targetPlayer, forPlayer, for_group, rollArgs, dice
-      let chatArgs = content.split(' ')
-        let bot = chatArgs.shift()
-        let command = chatArgs.shift()
-        let activeGame = findChannelGame(gameIndex, channel)
-        switch(_.toLower(command)){
-          case 'start':
-            if(_.find(gameIndex, {channel: channel.id})) {
-              channel.send(`There's already a game in this channel.`)
-              break
-            } else {
-              gameIndex.push(new GameSession(author.id, channel.id, chatArgs.join(' ')))
-              activeGame = findChannelGame(gameIndex, channel)
-              channel.send(`Starting **${activeGame.name}**`)
-              sendStatusUpdate({activeGame, channel})
-            }
+      let targetPlayer, forPlayer, for_group, rollArgs, dice, receivingPlayer
+      let chatArgs = content.split(/ +/)
+      let bot = chatArgs.shift()
+      let command = chatArgs.shift()
+      let activeGame = findChannelGame(gameIndex, channel)
+      switch(_.toLower(command)){
+        case 'start':
+          if(_.find(gameIndex, {channel: channel.id})) {
+            channel.send(`There's already a game in this channel.`)
             break
-          case 'endGame':
-            if(activeGame && activeGame.isGM(author.id)) {
-              channel.send('are you sure?')
-            } else {
-              channel.send(`You aren't running a game right now.`)
-            }
-            break
+          } else {
+            gameIndex.push(new GameSession(author.id, channel.id, chatArgs.join(' ')))
+            activeGame = findChannelGame(gameIndex, channel)
+            channel.send(`Starting **${activeGame.name}**`)
+            sendStatusUpdate({activeGame, channel})
+          }
+          break
+        if(_.isUndefined(activeGame)) throw new Error(`There's no active game. Use **start** to start one.`)
+          break
+        case 'end':
+          if(activeGame && activeGame.isGM(author.id)) {
+            _.remove(gameIndex, {channel: channel.id})
+            channel.send(`Game ended.`)
+          } else {
+            channel.send(`You aren't running a game right now.`)
+          }
+          break
         case 'add':
           let newPlayer = _.replace(chatArgs.shift(), /[^a-z\d]/g, '')
           if(activeGame && activeGame.isGM(author.id) && !activeGame.isPlayer(newPlayer)) {
@@ -125,6 +131,15 @@ client.on('message', (receivedMessage) => {
           if(forPlayer && activeGame.isGM(author.id)) targetPlayer =  forPlayer.replace(/[^\d]/g, '')
           if(activeGame && activeGame.isPlayer(author.id) && activeGame.isPlayer(targetPlayer)) activeGame.reroll1s({player_id: targetPlayer, replyTo})
           break
+        case 'wild':
+          rollArgs = chatArgs.join(' ').split(/ +(?=!)/)
+          dice = pullDice(rollArgs.shift())
+          targetPlayer = author.id
+          forPlayer = _.find(rollArgs, arg => _.startsWith(arg, '!for '))
+          for_group = (_.find(rollArgs, arg => _.startsWith(arg, '!group'))) ? true : false
+          if(forPlayer && activeGame.isGM(author.id)) targetPlayer =  forPlayer.replace(/[^\d]/g, '')
+          if(activeGame && activeGame.isPlayer(author.id) && activeGame.isPlayer(targetPlayer)) activeGame.wild({player_id: targetPlayer, dice, replyTo})
+          break
         case 'status':
           if(activeGame && activeGame.isPlayer(author.id)) {
             sendStatusUpdate({activeGame, channel})
@@ -135,23 +150,49 @@ client.on('message', (receivedMessage) => {
           dice = pullDice(rollArgs.shift())
           targetPlayer = author.id
           forPlayer = _.find(rollArgs, arg => _.startsWith(arg, '!for '))
-          for_group = (_.find(rollArgs, arg => _.startsWith(arg, '!group'))) ? true : false
+          for_group = (_.find(rollArgs, arg => _.startsWith(arg, '!group'))) ?
+            true :
+            false
+          let leave = (_.find(rollArgs, arg => _.startsWith(arg, '!leave'))) ?
+            _.toNumber(_.find(rollArgs, arg => _.startsWith(arg, '!leave')).split(/ +/i)[1]) :
+            undefined
+          let take = (_.find(rollArgs, arg => _.startsWith(arg, '!take'))) ?
+            _.toNumber(_.find(rollArgs, arg => _.startsWith(arg, '!take')).split(/ +/i)[1]) :
+            undefined
           if(forPlayer && activeGame.isGM(author.id)) targetPlayer =  forPlayer.replace(/[^\d]/g, '')
-          activeGame.spend({player_id: targetPlayer, dice, replyTo})
+          activeGame.spend({player_id: targetPlayer, dice, leave, take, replyTo})
+          break
+        case 'scrap':
+          rollArgs = chatArgs.join(' ').split(/ +(?=!)/)
+          dice = pullDice(rollArgs.shift())
+          targetPlayer = author.id
+          forPlayer = _.find(rollArgs, arg => _.startsWith(arg, '!for '))
+          for_group = (_.find(rollArgs, arg => _.startsWith(arg, '!group'))) ?
+            true :
+            false
+          if(forPlayer && activeGame.isGM(author.id)) targetPlayer =  forPlayer.replace(/[^\d]/g, '')
+          activeGame.spend({player_id: targetPlayer, dice, leave: 0, replyTo})
           break
         case 'give':
-          let receivingPlayer = chatArgs.shift().replace(/[^\d]/g, '')
+          receivingPlayer = chatArgs.shift().replace(/[^\d]/g, '')
           rollArgs = chatArgs.join(' ').split(/ +(?=!)/)
           dice = pullDice(rollArgs.shift())
           targetPlayer = author.id
           activeGame.give({giving_player_id: targetPlayer, receiving_player_id: receivingPlayer, dice, replyTo})
+          break
+        case 'grant':
+          receivingPlayer = chatArgs.shift().replace(/[^\d]/g, '')
+
+          rollArgs = chatArgs.join(' ').split(/ +(?=!)/)
+          dice = pullDice(rollArgs.shift())
+          activeGame.grant({player_id: receivingPlayer, dice, replyTo})
           break
         case 'take':
           let holdingPlayer = chatArgs.shift().replace(/[^\d]/g, '')
           rollArgs = chatArgs.join(' ').split(/ +(?=!)/)
           dice = pullDice(rollArgs.shift())
           targetPlayer = author.id
-          activeGame.give({giving_player_id: targetPlayer, receiving_player_id: receivingPlayer, dice, replyTo})
+          activeGame.give({giving_player_id: holdingPlayer, receiving_player_id: targetPlayer, dice, replyTo})
           break
         default:
           channel.send(`I don't know what you're talking about.`)
@@ -162,15 +203,17 @@ client.on('message', (receivedMessage) => {
             !reroll1s
           useSaved: spend an arbitrary set regardless of your roll
           take wxh: take dice from someone's pool (rival relationship)
-          grant wxh: add dice to a pool from nowhere. GM only
           roll !keep wxh: keep a set from your existing pool and reroll remainder
-          roll: needs to empty existing pool for the player
           roll !wild: needs to respond back to the player with their existing roll, asking them what to set their 1s to
           clearGroupPool: empty the group pool
 
           ******/
         }
     } else return
+  } catch(e){ 
+    console.error('err', e)
+    replyTo(`Couldn't do that for reasons: ${e}`)
+  } 
 })
 
 // Get your bot's secret token from:

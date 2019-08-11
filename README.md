@@ -3,7 +3,7 @@ A die roller for the *Velvet Generation* RPG.
 
 Since the *Velvet Generation* rules engine involves a lot more player-to-player interaction than most RPGs, this bot exists to track what players have rolled, and to allow them to exchange dice between one another and the group pool.
 
-This app works through a bot named **Nomi.** Invite Nomi to your server by following this link: https://discordapp.com/api/oauth2/authorize?client_id=597149708909150229&permissions=0&scope=bot
+This app works through a bot named **Nomi.** Invite Nomi to your server by following this link: [here](https://discordapp.com/api/oauth2/authorize?client_id=597149708909150229&permissions=93264&scope=bot)
 
 ## Commands
 
