@@ -13,6 +13,9 @@
     "chai": "^4.2.0",
     "mocha": "^6.1.4"
   },
+  "engines":{
+    "node":"12.6.0"
+  },
   "scripts": {
     "test": "mocha test",
     "start": "node index.js",
